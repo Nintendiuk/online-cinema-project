@@ -51,6 +51,9 @@ STATE-00
     Схема створюється один раз на сесію.
   - Тести ходять у справжній PostgreSQL (не sqlite): db_session, а через нього
     async_client, вимагають запущеного db. Без БД доступний лише `pytest -m unit`.
+  - .env описує світ з хоста (localhost, Postgres на 5433); docker-compose.yml перекриває
+    хостнейми через YAML-анкор x-app-env (db, redis, minio, mailhog) для web і
+    celery-*. Нова змінна з хостом або портом додається в двох місцях.
   - Міграції в контейнерах виконуються тільки там, де RUN_MIGRATIONS=1 (сервіс web);
     entrypoint робить exec "$@", команда за замовчуванням — у CMD Dockerfile.
   - Celery-застосунок — src/core/celery_app.py:celery_app; таски наступних фаз
