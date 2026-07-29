@@ -14,10 +14,12 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from src.api.deps import get_email_sender
 from src.core.config import get_settings
 from src.db.base import Base
 from src.db.session import get_session
 from src.main import create_app
+from tests.doubles.fake_email import FakeEmailSender
 
 
 @pytest.fixture(scope="session")
@@ -60,8 +62,20 @@ async def db_session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture
-def app(db_session: AsyncSession) -> Generator[FastAPI, None, None]:
-    """Build the application with the database dependency pinned to the test session."""
+def fake_email_sender() -> FakeEmailSender:
+    """Return a fresh in-memory e-mail sender for one test."""
+    return FakeEmailSender()
+
+
+@pytest.fixture
+def app(
+    db_session: AsyncSession, fake_email_sender: FakeEmailSender
+) -> Generator[FastAPI, None, None]:
+    """Build the application with the database and e-mail seams pinned.
+
+    Overriding ``get_email_sender`` is what keeps SMTP out of the run: no test
+    can reach a mail server even if one happens to be listening.
+    """
     application = create_app()
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -69,6 +83,7 @@ def app(db_session: AsyncSession) -> Generator[FastAPI, None, None]:
         yield db_session
 
     application.dependency_overrides[get_session] = override_get_session
+    application.dependency_overrides[get_email_sender] = lambda: fake_email_sender
     yield application
     application.dependency_overrides.clear()
 
