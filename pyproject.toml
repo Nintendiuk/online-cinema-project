@@ -16,7 +16,7 @@ alembic = "^1.14"
 pydantic = "^2.10"
 pydantic-settings = "^2.7"
 pyjwt = "^2.10"
-passlib = { version = "^1.7.4", extras = ["bcrypt"] }
+bcrypt = "^5.0"
 python-multipart = "^0.0.20"
 celery = "^5.4"
 redis = "^5.2"
@@ -37,7 +37,6 @@ black = "^24.10"
 mypy = "^1.14"
 faker = "^33.1"
 polyfactory = "^2.18"
-types-passlib = "^1.7"
 
 [build-system]
 requires = ["poetry-core"]
@@ -53,10 +52,12 @@ select = ["E", "F", "I", "B", "UP", "SIM", "C4", "ANN"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+known-third-party = ["alembic"]
 
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+extend-exclude = "alembic/versions"
 
 [tool.mypy]
 strict = true
@@ -64,7 +65,7 @@ plugins = ["pydantic.mypy"]
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["stripe", "passlib.*"]
+module = ["stripe", "celery", "celery.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
