@@ -94,7 +94,7 @@ services:
     build:
       context: .
       dockerfile: docker/web/Dockerfile
-    command: celery -A src.core.celery_app:celery_app worker --loglevel=info
+    command: celery -A src.tasks.celery_app:celery_app worker --loglevel=info
     environment: *app-env
     env_file:
       - .env
@@ -110,7 +110,7 @@ services:
     build:
       context: .
       dockerfile: docker/web/Dockerfile
-    command: celery -A src.core.celery_app:celery_app beat --loglevel=info
+    command: celery -A src.tasks.celery_app:celery_app beat --loglevel=info
     environment: *app-env
     env_file:
       - .env
