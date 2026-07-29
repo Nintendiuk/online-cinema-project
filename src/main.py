@@ -11,6 +11,7 @@ from src.core.exceptions import (
     AuthenticationError,
     ConflictError,
     ExternalServiceError,
+    InvalidRequestError,
     NotFoundError,
     PermissionDeniedError,
     TokenExpiredError,
@@ -24,6 +25,7 @@ ERROR_STATUS_CODES: dict[type[AppError], int] = {
     AuthenticationError: 401,
     PermissionDeniedError: 403,
     TokenExpiredError: 400,
+    InvalidRequestError: 400,
     ExternalServiceError: 502,
 }
 DEFAULT_ERROR_STATUS_CODE = 500
