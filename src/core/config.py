@@ -67,8 +67,19 @@ class Settings(BaseSettings):
     stripe_cancel_url: str
 
     # Application
+    frontend_base_url: str
     environment: Literal["development", "test", "production"]
     docs_enabled: bool
+
+    @property
+    def activation_url(self) -> str:
+        """Page the activation e-mail links to; the token is appended as a query."""
+        return f"{self.frontend_base_url.rstrip('/')}/activate"
+
+    @property
+    def login_url(self) -> str:
+        """Page the activation-complete e-mail links to."""
+        return f"{self.frontend_base_url.rstrip('/')}/login"
 
     @property
     def database_url(self) -> str:
