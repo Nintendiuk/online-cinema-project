@@ -28,3 +28,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Celery beat state
+celerybeat-schedule
+celerybeat-schedule.*
