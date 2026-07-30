@@ -53,9 +53,7 @@ SalesViewerDep = Annotated[User, Depends(require_permission(Permission.VIEW_SALE
 """Guard for the throwaway sales probe defined further down."""
 
 
-@pytest.mark.parametrize(
-    ("method", "url_for", "body"), GUARDED_ROUTES, ids=ROUTE_IDS
-)
+@pytest.mark.parametrize(("method", "url_for", "body"), GUARDED_ROUTES, ids=ROUTE_IDS)
 @pytest.mark.parametrize(("group", "expected"), GROUP_EXPECTATIONS, ids=GROUP_IDS)
 async def test_guarded_routes_enforce_the_group_matrix(
     async_client: AsyncClient,
@@ -79,9 +77,7 @@ async def test_guarded_routes_enforce_the_group_matrix(
     assert response.status_code == expected
 
 
-@pytest.mark.parametrize(
-    ("method", "url_for", "body"), GUARDED_ROUTES, ids=ROUTE_IDS
-)
+@pytest.mark.parametrize(("method", "url_for", "body"), GUARDED_ROUTES, ids=ROUTE_IDS)
 async def test_guarded_routes_answer_401_without_credentials(
     async_client: AsyncClient,
     db_session: AsyncSession,
@@ -110,6 +106,7 @@ def sales_probe(app: FastAPI) -> FastAPI:
     Defined here rather than in ``conftest`` because exactly one module needs it,
     and production has no sales endpoint until a later phase.
     """
+
     @app.get(SALES_PROBE_URL)
     async def sales(current_user: SalesViewerDep) -> dict[str, int]:
         """Echo the id of a caller allowed to look at sales figures."""

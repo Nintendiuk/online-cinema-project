@@ -35,9 +35,7 @@ async def user_in_group(
 ) -> User:
     """Create an account belonging to the named group, seeding the group row."""
     row = await create_group(db_session, group)
-    return await create_user(
-        db_session, email=email, is_active=is_active, group=row
-    )
+    return await create_user(db_session, email=email, is_active=is_active, group=row)
 
 
 async def caller_in_group(

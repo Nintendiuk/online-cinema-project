@@ -68,9 +68,7 @@ async def test_purge_removes_only_expired_rows(db_session: AsyncSession) -> None
 
     assert removed == 1
     assert await _token_count(db_session) == 1
-    survivors = (
-        (await db_session.execute(select(PasswordResetToken))).scalars().all()
-    )
+    survivors = (await db_session.execute(select(PasswordResetToken))).scalars().all()
     assert [token.token for token in survivors] == [fresh.token]
 
 

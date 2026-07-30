@@ -37,9 +37,7 @@ def test_the_interface_declares_every_account_notification() -> None:
     assert set(REQUIRED_METHODS) <= EmailSenderInterface.__abstractmethods__
 
 
-@pytest.mark.parametrize(
-    "implementation", IMPLEMENTATIONS, ids=_implementation_id
-)
+@pytest.mark.parametrize("implementation", IMPLEMENTATIONS, ids=_implementation_id)
 def test_implementation_has_no_missing_overrides(
     implementation: type[EmailSenderInterface],
 ) -> None:
@@ -48,9 +46,7 @@ def test_implementation_has_no_missing_overrides(
 
 
 @pytest.mark.parametrize("name", REQUIRED_METHODS)
-@pytest.mark.parametrize(
-    "implementation", IMPLEMENTATIONS, ids=_implementation_id
-)
+@pytest.mark.parametrize("implementation", IMPLEMENTATIONS, ids=_implementation_id)
 def test_signatures_match_the_interface(
     implementation: type[EmailSenderInterface], name: str
 ) -> None:

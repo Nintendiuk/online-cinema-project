@@ -30,8 +30,7 @@ def test_every_group_has_a_row() -> None:
 def test_rows_are_immutable() -> None:
     """Each row is a frozenset, so no caller can widen it at runtime."""
     assert all(
-        isinstance(permissions, frozenset)
-        for permissions in GROUP_PERMISSIONS.values()
+        isinstance(permissions, frozenset) for permissions in GROUP_PERMISSIONS.values()
     )
 
 
@@ -52,9 +51,7 @@ def test_administrators_hold_every_permission() -> None:
 @pytest.mark.parametrize("permission", sorted(Permission))
 def test_every_permission_is_reachable_and_inherited(permission: Permission) -> None:
     """A permission granted lower down is granted at every level above it."""
-    holders = [
-        group for group in UserGroupEnum if has_permission(group, permission)
-    ]
+    holders = [group for group in UserGroupEnum if has_permission(group, permission)]
 
     assert holders, f"{permission} is granted to nobody"
     assert has_permission(UserGroupEnum.ADMIN, permission)
