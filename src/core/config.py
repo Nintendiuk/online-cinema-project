@@ -82,6 +82,11 @@ class Settings(BaseSettings):
         return f"{self.frontend_base_url.rstrip('/')}/login"
 
     @property
+    def password_reset_url(self) -> str:
+        """Page the reset e-mail links to; address and token arrive as a query."""
+        return f"{self.frontend_base_url.rstrip('/')}/password-reset"
+
+    @property
     def database_url(self) -> str:
         """Async SQLAlchemy DSN used by the application engine."""
         return self._dsn(driver="postgresql+asyncpg")
