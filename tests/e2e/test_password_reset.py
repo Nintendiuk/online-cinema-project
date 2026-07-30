@@ -217,6 +217,36 @@ class TestResetCompletion:
 
         assert response.status_code == 400
 
+    async def test_unknown_address_is_refused_like_an_unknown_token(
+        self, async_client: AsyncClient
+    ) -> None:
+        """An address with no account cannot be told apart from a bad token."""
+        response = await async_client.post(
+            RESET_COMPLETE_URL,
+            json=reset_complete_payload(UNKNOWN_EMAIL, "never-issued-token"),
+        )
+
+        assert response.status_code == 400
+
+    async def test_inactive_account_cannot_complete_a_reset(
+        self, async_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """An unactivated account has no reset path, even holding a token row.
+
+        The request half never mails such an account, so a token can only exist
+        here because it was planted; the completion half refuses it anyway rather
+        than letting a reset link double as an activation bypass.
+        """
+        pending = await inactive_user(db_session, email="dormant@example.com")
+        token = await create_password_reset_token(db_session, pending)
+
+        response = await async_client.post(
+            RESET_COMPLETE_URL, json=reset_complete_payload(pending.email, token.token)
+        )
+
+        assert response.status_code == 400
+        assert len(await reset_tokens_for(db_session, pending.id)) == 1
+
     @pytest.mark.parametrize("rule", sorted(WEAK_PASSWORDS))
     async def test_weak_new_password_is_rejected(
         self, async_client: AsyncClient, db_session: AsyncSession, rule: str
@@ -227,9 +257,7 @@ class TestResetCompletion:
 
         response = await async_client.post(
             RESET_COMPLETE_URL,
-            json=reset_complete_payload(
-                user.email, token.token, WEAK_PASSWORDS[rule]
-            ),
+            json=reset_complete_payload(user.email, token.token, WEAK_PASSWORDS[rule]),
         )
 
         assert response.status_code == 422
