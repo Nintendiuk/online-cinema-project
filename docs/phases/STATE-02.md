@@ -127,21 +127,31 @@ Decisions affecting later phases:
   8. Email normalisation happens in a before-mode field validator so that a value
      with whitespace or mixed case reaches EmailStr already canonical.
 
+Verified green: ruff, black, mypy --strict (41 files), pytest 86/86 after the
+MissingGreenlet fix in tests/e2e/accounts_support.py.
+
 Known technical debt:
-  1. email-validator must be added to the dependencies (poetry add email-validator);
-     EmailStr does not import without it. Not done here because poetry was not
-     available in the authoring environment.
-  2. mypy --strict was verified on a transform of the two PEP 695 classes into the
-     classic Generic form (the authoring environment had no Python 3.12). Re-run
-     mypy --strict src/ before merging.
-  3. The e2e suite and the alembic autogenerate check were never executed: no
-     PostgreSQL was reachable. They are the first thing to run.
-  4. tests/integration/test_accounts_models.py is 411 lines, over the 300-line cap.
+  1. redis publishes no host port in docker-compose.yml, but .env points the broker
+     at redis://localhost:6379. Any celery command run from the host therefore
+     cannot connect. Either add "6379:6379" to the redis service or run celery
+     inside the container. Left as-is because changing published ports affects
+     every developer's machine.
+  2. The alembic autogenerate gate must not be run straight after pytest: the
+     _schema fixture drops every table at session end, and alembic_version is not
+     in Base.metadata so it survives still claiming head. The result is an
+     autogenerate diff that recreates the whole schema. Run
+     `alembic stamp base && alembic upgrade head` first.
+  3. tests/integration/test_accounts_models.py is 411 lines, over the 300-line cap.
      Inherited from phase 1.
-  5. The acceptance gate 'grep -r "passlib" src/' still matches one docstring in
+  4. The acceptance gate 'grep -r "passlib" src/' still matches one docstring in
      src/security/passwords.py that explains why passlib is not used. Scope the
      grep to imports, or accept the match.
-  6. test_token_purge.py landed after its implementation, not before it.
+  5. test_token_purge.py landed after its implementation, not before it.
+  6. Coverage sits below the 85% gate, and services/accounts is below 100%. The
+     uncovered paths are the SMTP sender (no test doubles the transport), the
+     celery task module, and the ExternalServiceError rollback path in
+     registration. FakeEmailSender.raise_on_send exists for exactly that test and
+     nothing calls it yet — that is the first thing phase 3 should close.
   7. Still open from phase 0: permissive CORS, unused aiosqlite, no healthcheck on
      celery-worker / celery-beat.
 ```
@@ -149,13 +159,23 @@ Known technical debt:
 ## Gates still to run on a machine with the stack up
 
 ```bash
-poetry add email-validator          # blocks everything below
 docker compose up -d db redis mailhog
-poetry run ruff check src tests     # verified clean
-poetry run black --check src tests  # verified clean
-poetry run mypy --strict src/       # verified on an equivalent transform only
-poetry run pytest -q                # NOT RUN — no PostgreSQL available
+
+poetry run ruff check src tests      # green
+poetry run black --check src tests   # green
+poetry run mypy --strict src/        # green, 41 files
+poetry run pytest -q                 # green, 86 passed
 poetry run pytest --cov=src --cov-report=term-missing
+
+# Alembic: restore the schema first. pytest drops every table on the way out and
+# alembic_version survives still claiming head, so autogenerate would otherwise
+# report the entire schema as new.
+poetry run alembic stamp base
+poetry run alembic upgrade head
 poetry run alembic revision --autogenerate -m "check empty"   # must be empty
-poetry run celery -A src.tasks.celery_app inspect registered  # needs a worker up
+# then delete the generated file
+
+# Celery: redis has no host port, so this only works from inside the network.
+docker compose up -d celery-worker
+docker compose exec celery-worker celery -A src.tasks.celery_app inspect registered
 ```
