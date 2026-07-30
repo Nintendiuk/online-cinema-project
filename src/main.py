@@ -1,5 +1,8 @@
 """Application factory and the single place where domain errors become HTTP."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,11 +14,14 @@ from src.core.exceptions import (
     AuthenticationError,
     ConflictError,
     ExternalServiceError,
+    InvalidRequestError,
     NotFoundError,
     PermissionDeniedError,
     TokenExpiredError,
     ValidationError,
 )
+from src.db.seed.groups import ensure_default_groups
+from src.db.session import async_session_factory
 
 ERROR_STATUS_CODES: dict[type[AppError], int] = {
     ValidationError: 422,
@@ -24,6 +30,7 @@ ERROR_STATUS_CODES: dict[type[AppError], int] = {
     AuthenticationError: 401,
     PermissionDeniedError: 403,
     TokenExpiredError: 400,
+    InvalidRequestError: 400,
     ExternalServiceError: 502,
 }
 DEFAULT_ERROR_STATUS_CODE = 500
@@ -47,6 +54,20 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Seed the reference user groups before the first request is served.
+
+    Registration assigns every new account to the USER group, so the row has to
+    exist. Seeding is idempotent, which makes it safe on every boot and safe
+    when several replicas start at once.
+    """
+    async with async_session_factory() as session:
+        await ensure_default_groups(session)
+        await session.commit()
+    yield
+
+
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application."""
     settings = get_settings()
@@ -55,6 +76,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs" if settings.docs_enabled else None,
         redoc_url="/redoc" if settings.docs_enabled else None,
+        lifespan=lifespan,
     )
 
     app.add_middleware(

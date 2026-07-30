@@ -12,6 +12,7 @@ __all__ = [
     "AuthenticationError",
     "ConflictError",
     "ExternalServiceError",
+    "InvalidRequestError",
     "NotFoundError",
     "PermissionDeniedError",
     "TokenExpiredError",
@@ -69,6 +70,19 @@ class TokenExpiredError(AppError):
     """Raised when an authentication or authorization token has expired."""
 
     default_message: str = "Token has expired."
+
+
+class InvalidRequestError(AppError):
+    """Raised when a well-formed request cannot be applied to the current state.
+
+    Distinct from ``ValidationError``, which is about the shape of the payload,
+    and from ``AuthenticationError``, which is about a credential. This one
+    covers a client mistake that only the domain can detect: an activation token
+    that was never issued, one that belongs to somebody else, or an account that
+    is already active.
+    """
+
+    default_message: str = "Request cannot be applied in the current state."
 
 
 class ExternalServiceError(AppError):

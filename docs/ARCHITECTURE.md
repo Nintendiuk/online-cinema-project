@@ -208,6 +208,9 @@ AppError
 ├── AuthenticationError    → 401   (bad credentials, expired/invalid token)
 ├── PermissionDeniedError  → 403
 ├── TokenExpiredError      → 400   (activation/reset link expired)
+├── InvalidRequestError    → 400   (well-formed request, impossible in current state:
+│                                   unknown or foreign activation token, account
+│                                   already active)
 └── ExternalServiceError   → 502   (Stripe, SMTP, S3)
 ```
 
