@@ -39,16 +39,38 @@ class TokenLifecycleService[
         """
         self._repository: TokenRepository[TokenT] = repository
 
-    async def issue(self, user_id: int, ttl: timedelta) -> TokenT:
-        """Replace whatever token this user holds with a freshly minted one.
+    async def issue(
+        self,
+        user_id: int,
+        ttl: timedelta,
+        *,
+        value: str | None = None,
+        replace_existing: bool = True,
+    ) -> TokenT:
+        """Mint a token for this user and persist it.
 
-        Dropping the old rows first is what makes a resend idempotent: the user
-        ends up holding exactly one live token however often they ask.
+        Both keyword parameters default to the phase-2 behaviour, so activation
+        and password reset are unaffected by their existence.
+
+        ``replace_existing`` drops the user's other tokens first, which is what
+        makes a resend idempotent: the user ends up holding exactly one live
+        activation token however often they ask. Refresh tokens are the one
+        family where that is wrong — a session per device is legitimate — so
+        login passes ``False`` and leaves the other sessions alone.
+
+        ``value`` supplies the string to store instead of generating one. Login
+        uses it to persist the SHA-256 digest of a refresh JWT rather than a
+        random secret: the credential the client holds is the JWT, and the row
+        is only the lookup key for it.
         """
-        await self._repository.delete_for_user(user_id)
+        if replace_existing:
+            await self._repository.delete_for_user(user_id)
+        token_value = (
+            value if value is not None else secrets.token_urlsafe(TOKEN_ENTROPY_BYTES)
+        )
         return await self._repository.create(
             user_id=user_id,
-            token=secrets.token_urlsafe(TOKEN_ENTROPY_BYTES),
+            token=token_value,
             expires_at=datetime.now(UTC) + ttl,
         )
 
