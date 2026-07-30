@@ -13,11 +13,15 @@ from src.integrations.email.interface import EmailSenderInterface, SentEmail
 __all__ = [
     "ACTIVATION_COMPLETE_SUBJECT",
     "ACTIVATION_SUBJECT",
+    "PASSWORD_CHANGED_SUBJECT",
+    "PASSWORD_RESET_SUBJECT",
     "FakeEmailSender",
 ]
 
 ACTIVATION_SUBJECT: Final[str] = "Activate your account"
 ACTIVATION_COMPLETE_SUBJECT: Final[str] = "Account activated"
+PASSWORD_RESET_SUBJECT: Final[str] = "Reset your password"
+PASSWORD_CHANGED_SUBJECT: Final[str] = "Password changed"
 
 
 class FakeEmailSender(EmailSenderInterface):
@@ -68,6 +72,24 @@ class FakeEmailSender(EmailSenderInterface):
         body = f"Your account has been activated. You can log in here: {login_link}"
         self.sent.append(
             SentEmail(to=email, subject=ACTIVATION_COMPLETE_SUBJECT, body=body)
+        )
+
+    async def send_password_reset_email(self, email: str, reset_link: str) -> None:
+        """Record a reset message carrying the link verbatim.
+
+        Unescaped for the same reason as the activation link: a test asserts that
+        the token value, which is a substring of the link, reaches the recipient.
+        """
+        self._guard()
+        body = f"Reset your password using this link: {reset_link}"
+        self.sent.append(SentEmail(to=email, subject=PASSWORD_RESET_SUBJECT, body=body))
+
+    async def send_password_changed_email(self, email: str) -> None:
+        """Record the notification that a password has changed."""
+        self._guard()
+        body = "Your password has been changed and every session was signed out."
+        self.sent.append(
+            SentEmail(to=email, subject=PASSWORD_CHANGED_SUBJECT, body=body)
         )
 
     def _guard(self) -> None:
