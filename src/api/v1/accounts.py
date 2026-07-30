@@ -12,10 +12,10 @@ from typing import Final
 
 from fastapi import APIRouter, status
 
-from src.api.deps import (
+from src.api.deps import CurrentUserDep
+from src.api.providers import (
     ActivationServiceDep,
     AuthenticationServiceDep,
-    CurrentUserDep,
     RegistrationServiceDep,
 )
 from src.models.accounts import User
@@ -169,3 +169,4 @@ async def logout(
     """Revoke the presented refresh token, leaving the caller's others alive."""
     await service.logout(current_user.id, payload.refresh_token)
     return MessageResponseSchema(message=LOGOUT_COMPLETE_MESSAGE)
+
