@@ -1,15 +1,23 @@
-"""Registration and activation endpoints.
+"""Registration, activation and session endpoints.
 
 Each handler is dependencies in, one service call, return. The resend endpoint
 answers with one fixed message whatever the outcome, which is what keeps an
 unknown address indistinguishable from a settled account.
+
+``/login/`` answers 201 rather than 200: it creates a session resource, and the
+refresh token it returns is the handle to it.
 """
 
 from typing import Final
 
 from fastapi import APIRouter, status
 
-from src.api.deps import ActivationServiceDep, RegistrationServiceDep
+from src.api.deps import (
+    ActivationServiceDep,
+    AuthenticationServiceDep,
+    CurrentUserDep,
+    RegistrationServiceDep,
+)
 from src.models.accounts import User
 from src.schemas.accounts import (
     ActivationRequestSchema,
@@ -18,6 +26,13 @@ from src.schemas.accounts import (
     UserRegistrationResponseSchema,
 )
 from src.schemas.common import MessageResponseSchema
+from src.schemas.tokens import (
+    AccessTokenResponseSchema,
+    LoginRequestSchema,
+    LogoutRequestSchema,
+    RefreshRequestSchema,
+    TokenPairResponseSchema,
+)
 
 __all__ = ["router"]
 
@@ -27,6 +42,7 @@ ACTIVATION_COMPLETE_MESSAGE: Final[str] = "Account activated successfully."
 RESEND_ACKNOWLEDGED_MESSAGE: Final[str] = (
     "If the account exists and is not yet active, an activation e-mail has been sent."
 )
+LOGOUT_COMPLETE_MESSAGE: Final[str] = "Session ended successfully."
 
 
 @router.post(
@@ -87,3 +103,69 @@ async def resend_activation(
     """Issue a new activation token when warranted, and always acknowledge."""
     await service.resend_activation(payload.email)
     return MessageResponseSchema(message=RESEND_ACKNOWLEDGED_MESSAGE)
+
+
+@router.post(
+    "/login/",
+    response_model=TokenPairResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary="Open a session and receive a token pair",
+    responses={
+        401: {"description": "The e-mail or the password is wrong."},
+        403: {"description": "The account exists but has not been activated."},
+        422: {"description": "Malformed payload."},
+    },
+)
+async def login(
+    payload: LoginRequestSchema,
+    service: AuthenticationServiceDep,
+) -> TokenPairResponseSchema:
+    """Exchange credentials for an access and a refresh token."""
+    access_token, refresh_token = await service.login(payload.email, payload.password)
+    return TokenPairResponseSchema(
+        access_token=access_token, refresh_token=refresh_token
+    )
+
+
+@router.post(
+    "/refresh/",
+    response_model=AccessTokenResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Renew an access token",
+    responses={
+        401: {"description": "The refresh token is unknown, spent or expired."},
+        403: {"description": "The account behind the token is no longer active."},
+        422: {"description": "Malformed payload."},
+    },
+)
+async def refresh(
+    payload: RefreshRequestSchema,
+    service: AuthenticationServiceDep,
+) -> AccessTokenResponseSchema:
+    """Mint a new access token for a session that is still valid."""
+    access_token = await service.refresh(payload.refresh_token)
+    return AccessTokenResponseSchema(access_token=access_token)
+
+
+@router.post(
+    "/logout/",
+    response_model=MessageResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="End one session",
+    responses={
+        401: {
+            "description": "No bearer token, an invalid one, or a refresh token "
+            "belonging to another account."
+        },
+        403: {"description": "The authenticated account is no longer active."},
+        422: {"description": "Malformed payload."},
+    },
+)
+async def logout(
+    payload: LogoutRequestSchema,
+    current_user: CurrentUserDep,
+    service: AuthenticationServiceDep,
+) -> MessageResponseSchema:
+    """Revoke the presented refresh token, leaving the caller's others alive."""
+    await service.logout(current_user.id, payload.refresh_token)
+    return MessageResponseSchema(message=LOGOUT_COMPLETE_MESSAGE)

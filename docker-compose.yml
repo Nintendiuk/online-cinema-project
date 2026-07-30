@@ -32,6 +32,10 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Published so that celery commands run from the host reach the same broker
+    # the containers use; .env points CELERY_BROKER_URL at localhost.
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

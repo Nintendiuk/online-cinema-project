@@ -79,8 +79,27 @@ def app(
     application = create_app()
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
-        """Yield the test-scoped session instead of opening a new one."""
-        yield db_session
+        """Yield the test-scoped session under the production transaction contract.
+
+        ``get_session`` commits when the handler returns and rolls back when it
+        raises; a substitute that only yields would let a failed request leave
+        its flushed rows visible to the assertions that follow, and the suite
+        would report atomicity the application does not actually provide.
+
+        A savepoint rather than a real transaction, because the whole test is
+        already wrapped in one that gets rolled back at teardown. Releasing or
+        rolling back the savepoint leaves that outer transaction usable, so a
+        test can issue a second request after a failed one.
+        """
+        savepoint = await db_session.begin_nested()
+        try:
+            yield db_session
+        except Exception:
+            if savepoint.is_active:
+                await savepoint.rollback()
+            raise
+        if savepoint.is_active:
+            await savepoint.commit()
 
     application.dependency_overrides[get_session] = override_get_session
     application.dependency_overrides[get_email_sender] = lambda: fake_email_sender

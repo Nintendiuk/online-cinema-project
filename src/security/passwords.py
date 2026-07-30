@@ -3,8 +3,10 @@
 The only place in the project where a password is hashed or verified. Services
 call these two functions; nothing else may import ``bcrypt``.
 
-``passlib`` is deliberately not used: its last release predates bcrypt 4 and its
-backend probe breaks against current versions of the library.
+Hashing calls the ``bcrypt`` library directly. The older wrapper libraries that
+used to be conventional for this are deliberately absent: their most recent
+releases predate bcrypt 4, and their backend-detection probe raises against the
+versions this project pins.
 """
 
 import bcrypt
