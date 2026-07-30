@@ -107,7 +107,7 @@ New conftest fixtures:
 
 Migration: none. No model changed, so alembic autogenerate must stay empty.
 
-Branch: phase-02-registration-activation (21 commits off main, not yet merged)
+Branch: phase-02-registration-activation, merged to main as 6b2157d (--no-ff)
 
 Decisions affecting later phases:
   1. InvalidRequestError -> 400 is the error for a well-formed request the current
