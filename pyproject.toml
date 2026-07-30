@@ -25,6 +25,7 @@ aiosmtplib = "^3.0"
 boto3 = "^1.35"
 stripe = "^11.4"
 pillow = "^11.0"
+email-validator = "^2.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
@@ -82,6 +83,10 @@ markers = [
 [tool.coverage.run]
 source = ["src"]
 omit = ["alembic/*", "src/__init__.py"]
+# SQLAlchemy's async layer runs synchronous driver code inside greenlets. Without
+# these, coverage stops tracing a coroutine the moment it resumes from an awaited
+# database call, and whole service bodies are reported as unexecuted.
+concurrency = ["thread", "greenlet"]
 
 [tool.coverage.report]
 show_missing = true

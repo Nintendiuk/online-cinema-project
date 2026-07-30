@@ -28,15 +28,24 @@ def registration_payload(
 
 
 async def get_user(db_session: AsyncSession, email: str) -> User | None:
-    """Return the user with this e-mail, bypassing a stale identity map."""
-    db_session.expire_all()
-    result = await db_session.execute(select(User).where(User.email == email))
+    """Return the user with this e-mail, refreshed from the database.
+
+    ``populate_existing`` rather than ``expire_all``: expiring the whole session
+    would also invalidate the objects the test is still holding, and reading an
+    attribute off one of those would then attempt lazy IO from synchronous
+    context and raise ``MissingGreenlet``.
+    """
+    statement = (
+        select(User)
+        .where(User.email == email)
+        .execution_options(populate_existing=True)
+    )
+    result = await db_session.execute(statement)
     return result.scalar_one_or_none()
 
 
 async def user_count(db_session: AsyncSession, email: str) -> int:
     """Count users stored under this exact e-mail."""
-    db_session.expire_all()
     result = await db_session.execute(
         select(func.count()).select_from(User).where(User.email == email)
     )
@@ -45,10 +54,12 @@ async def user_count(db_session: AsyncSession, email: str) -> int:
 
 async def tokens_for(db_session: AsyncSession, user_id: int) -> list[ActivationToken]:
     """Return every activation token currently owned by the user."""
-    db_session.expire_all()
-    result = await db_session.execute(
-        select(ActivationToken).where(ActivationToken.user_id == user_id)
+    statement = (
+        select(ActivationToken)
+        .where(ActivationToken.user_id == user_id)
+        .execution_options(populate_existing=True)
     )
+    result = await db_session.execute(statement)
     return list(result.scalars().all())
 
 
