@@ -177,38 +177,62 @@ Merged to main as <hash> (--no-ff), branch deleted   <- fill in after the gates 
 
 ## Runbook — gates still to run
 
-```bash
-# 1. static (already green in this environment)
+PowerShell, from the repository root, virtualenv active. `&&` is not a statement
+separator in PowerShell and `grep` does not exist there, so the commands below are
+written for that shell rather than for bash.
+
+**Always pass `tests` explicitly.** `testpaths` in `pyproject.toml` is ignored the
+moment pytest is invoked without arguments from a rootdir it does not recognise —
+a bare `pytest` once walked out of the project and tried to collect all of `C:\`,
+producing ~1500 collection errors that had nothing to do with this phase.
+
+```powershell
+# 0. the venv must have a working pydantic. A bare `pytest tests` that reports
+#    ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'
+#    means the binary wheel is broken, not that the tests are.
+poetry install --sync
+# or, without poetry:
+pip install --force-reinstall --no-cache-dir pydantic pydantic-core
+
+# 1. static (green as of this branch)
 ruff check src tests
 black --check src tests
 
-# 2. types — needs Python 3.12, PEP 695 syntax
+# 2. types — needs Python 3.12; PEP 695 generics will not parse on anything older
 mypy --strict src/
 
 # 3. tests — needs the compose stack up
 docker compose up -d db redis
-pytest -q
-pytest --cov=src --cov-report=term-missing \
-       --cov-fail-under=85 -q
-# services/ and security/ must be at 100 %
+python -m pytest tests -q
+python -m pytest tests -q --cov=src --cov-report=term-missing --cov-fail-under=85
+# services/ and security/ must both read 100 %
 
-# 4. migration diff — NEVER straight after pytest (see PHASE-03 §1.3)
-alembic stamp base && alembic upgrade head
-alembic revision --autogenerate -m "probe"   # must be empty; delete the file
+# 4. migration diff — NEVER straight after pytest (see PHASE-03 §1.3).
+#    The _schema fixture drops every table on teardown while alembic_version
+#    survives claiming head, so autogenerate then "detects" the whole schema as
+#    new. That is the fixture talking, not a real diff.
+alembic stamp base
+alembic upgrade head
+alembic revision --autogenerate -m "probe"
+#    Open the generated file: upgrade() must be `pass`. Then delete it:
+Remove-Item alembic\versions\*probe.py
 
-# 5. grep gates (green)
-grep -rn "HTTPException" src/
-grep -rni "passlib" src/ --include=*.py
-grep -rn "jwt\." src/ --include=*.py | grep -v security/jwt_manager.py
+# 5. grep gates
+Select-String -Path src\*.py -Recurse -Pattern "HTTPException"
+Select-String -Path src\*.py -Recurse -Pattern "passlib"
+Select-String -Path src\*.py -Recurse -Pattern "jwt\." |
+    Where-Object { $_.Path -notmatch "jwt_manager" }
+#    All three must print nothing. (Verified empty on this branch.)
 
 # 6. Swagger
-# open /docs, click Authorize, paste an access token from /accounts/login/,
-# call the probe of your choice and confirm 200
+#    Start the app, open /docs, click Authorize, paste an access token from
+#    POST /accounts/login/, then call POST /accounts/logout/ and confirm it is
+#    reached rather than 401.
 ```
 
 ## Merge
 
-```bash
+```powershell
 git checkout main
 git merge --no-ff phase-03-jwt-authentication
 git push origin main
