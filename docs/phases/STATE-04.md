@@ -1,12 +1,24 @@
 # STATE-04 — Password Management & Role-Based Access Control
 
-> **Gate status: partially verified.** `ruff`, `black --check` and all four grep
-> gates (including the new role-comparison gate) are green. `mypy --strict`,
-> `pytest` and the Alembic autogenerate diff have **not** been run: they need
-> Python 3.12 and a live PostgreSQL, and the environment this phase was written in
-> had neither — PEP 695 generics do not parse on anything older, which is the same
-> wall phase 3 hit. See §Runbook, fill in the numbers, and delete this block
-> before merging.
+> **Gate status: green except the migration diff and Swagger.**
+>
+> | Gate | Result |
+> |---|---|
+> | `ruff check src tests` | passed |
+> | `black --check src tests` | 90 files unchanged |
+> | `mypy --strict src/` | passed — after the ignore-code fix below |
+> | `pytest tests` | **269 passed** |
+> | coverage | **94.45 %** overall; `security/` 100 %, `services/` 100 % on everything this phase touched |
+> | grep gates (4) | clean; the role gate returns its three expected hits |
+> | Alembic autogenerate diff | **not run** — expected empty, no model changed |
+> | Swagger walk-through | **not run** |
+>
+> Two service modules sit at 97 % and predate this phase:
+> `activation.py:83` (activation submitted for an address with no account) and
+> `registration.py:75` (the default group missing). Both are unreachable from the
+> endpoints as currently tested; if the 100 %-on-`services/` rule is to be enforced
+> literally, they want the same treatment `AdminService`'s unseeded-group branch
+> got in `tests/integration/test_admin_service.py`.
 
 ## Modules created
 
@@ -195,16 +207,14 @@ empty per the runbook, and never straight after pytest.
 
 ## Known technical debt
 
-- **Three gates are unrun here**: `mypy --strict`, `pytest` (with coverage) and
-  the Alembic diff. Nothing in this phase is exotic, but the type gate has never
-  actually run on this repository — see the next item.
-- **The Celery decorator ignore code changed.** Phase 3 wrote
-  `# type: ignore[untyped-decorator]`; that is not a mypy error code, so under
-  `--strict` (which enables `warn_unused_ignores`) it would be reported as unused
-  *and* the real error would surface. Both tasks now say
-  `# type: ignore[misc]`, which is the code mypy uses for
-  `disallow_untyped_decorators`. If the first real mypy run disagrees, fix both
-  occurrences together.
+- **`untyped-decorator` is the right ignore code on the Celery tasks**, as phase 3
+  had it. This phase briefly changed both to `[misc]` on the assumption that the
+  former was not a real mypy code; it is, and the first `mypy --strict` run on
+  this repository said so twice over (unused ignore *and* uncovered error code).
+  Reverted. Do not "correct" it again.
+- **The Alembic diff and the Swagger walk-through are still unrun.** The diff is
+  expected to be empty — `git diff main -- src/models src/db` shows no model
+  change — but expected is not verified.
 - **The guards are synchronous dependencies**, so FastAPI runs them in a
   threadpool. That is safe only because `get_current_user` eager-loads the group:
   a guard that ever reads a lazily-loaded attribute would attempt IO from a worker

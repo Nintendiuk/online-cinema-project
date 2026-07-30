@@ -39,7 +39,7 @@ async def _purge_expired(model: type[TokenT]) -> int:
         return removed
 
 
-@celery_app.task(  # type: ignore[misc]  # celery ships no stubs
+@celery_app.task(  # type: ignore[untyped-decorator]  # celery ships no stubs
     name="src.tasks.tokens.purge_expired_activation_tokens"
 )
 def purge_expired_activation_tokens() -> int:
@@ -51,7 +51,7 @@ def purge_expired_activation_tokens() -> int:
     return asyncio.run(_purge_expired(ActivationToken))
 
 
-@celery_app.task(  # type: ignore[misc]  # celery ships no stubs
+@celery_app.task(  # type: ignore[untyped-decorator]  # celery ships no stubs
     name="src.tasks.tokens.purge_expired_password_reset_tokens"
 )
 def purge_expired_password_reset_tokens() -> int:
