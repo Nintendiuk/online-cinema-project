@@ -36,6 +36,27 @@ class UserRepository(BaseRepository[User]):
         result = await self._session.execute(statement)
         return result.scalar_one_or_none()
 
+    async def get_with_group(self, user_id: int) -> User | None:
+        """Return the account with this id, its group loaded and rows refreshed.
+
+        Distinct from ``get_by_id`` for two reasons, both of which the
+        authorisation check depends on. The inherited method reads through the
+        identity map and leaves relationships lazy, so touching ``user.group``
+        would attempt database IO from a synchronous attribute access — which
+        raises under the async driver. And a cached instance answers with the
+        group the account held when it was first loaded, whereas
+        ``populate_existing`` re-reads the row; that is what makes a group change
+        effective on the target's very next request instead of their next login.
+        """
+        statement = (
+            select(User)
+            .where(User.id == user_id)
+            .options(selectinload(User.group))
+            .execution_options(populate_existing=True)
+        )
+        result = await self._session.execute(statement)
+        return result.scalar_one_or_none()
+
     async def email_exists(self, email: str) -> bool:
         """Whether any account already uses this address."""
         return await self.exists(email=email)

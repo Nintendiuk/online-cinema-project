@@ -7,18 +7,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import CurrentUserDep
 from src.db.enums import UserGroupEnum
+from src.db.seed.groups import ensure_default_groups
 from src.models.accounts import UserGroup
 from tests.factories.accounts import create_group
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def seed_user_group(db_session: AsyncSession) -> UserGroup:
-    """Guarantee the USER group exists before any request is served.
+    """Guarantee every reference group exists before any request is served.
 
-    Registration assigns every new account to it. The application seeds the
-    groups from its lifespan hook, which ``ASGITransport`` does not run, so the
-    suite has to stand the row up itself.
+    Registration assigns each new account to the USER group and an administrator
+    may move one into any of the others, so all of them have to be present. The
+    application seeds them from its lifespan hook, which ``ASGITransport`` does
+    not run, so the suite stands them up itself — through the production seeding
+    function, so that the rows a test sees are the rows production creates.
+
+    The USER group is returned because it is the one a test is most likely to
+    want a handle on.
     """
+    await ensure_default_groups(db_session)
     return await create_group(db_session, UserGroupEnum.USER)
 
 

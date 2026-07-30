@@ -41,4 +41,11 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.tokens.purge_expired_activation_tokens",
         "schedule": crontab(minute=0),
     },
+    "purge-expired-password-reset-tokens": {
+        "task": "src.tasks.tokens.purge_expired_password_reset_tokens",
+        # Half an hour after the activation sweep rather than alongside it: both
+        # jobs open their own session and take table-wide delete locks, and there
+        # is no reason for them to do that at the same instant.
+        "schedule": crontab(minute=30),
+    },
 }

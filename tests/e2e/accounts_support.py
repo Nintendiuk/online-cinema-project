@@ -98,6 +98,15 @@ def bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def access_token_for(user: User) -> str:
+    """Mint an access token the application will accept for this account.
+
+    Shorter than logging in and, unlike a login, it does not also create a
+    refresh row — which matters to the tests that count those rows.
+    """
+    return app_jwt_manager().create_access_token({"user_id": user.id})
+
+
 async def active_user(
     db_session: AsyncSession,
     email: str = VALID_EMAIL,

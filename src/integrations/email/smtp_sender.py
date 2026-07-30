@@ -22,6 +22,8 @@ TEMPLATES_DIR: Final[Path] = Path(__file__).resolve().parent / "templates"
 
 ACTIVATION_SUBJECT: Final[str] = "Activate your Online Cinema account"
 ACTIVATION_COMPLETE_SUBJECT: Final[str] = "Your Online Cinema account is active"
+PASSWORD_RESET_SUBJECT: Final[str] = "Reset your Online Cinema password"
+PASSWORD_CHANGED_SUBJECT: Final[str] = "Your Online Cinema password has changed"
 
 
 class SMTPEmailSender(EmailSenderInterface):
@@ -62,6 +64,16 @@ class SMTPEmailSender(EmailSenderInterface):
             "activation_complete.html", email=email, login_link=login_link
         )
         await self._deliver(email, ACTIVATION_COMPLETE_SUBJECT, body)
+
+    async def send_password_reset_email(self, email: str, reset_link: str) -> None:
+        """Send the single-use link that authorises one password reset."""
+        body = self._render("password_reset.html", email=email, reset_link=reset_link)
+        await self._deliver(email, PASSWORD_RESET_SUBJECT, body)
+
+    async def send_password_changed_email(self, email: str) -> None:
+        """Tell the account holder that their password has just changed."""
+        body = self._render("password_changed.html", email=email)
+        await self._deliver(email, PASSWORD_CHANGED_SUBJECT, body)
 
     def _render(self, template_name: str, **context: str) -> str:
         """Render one template from ``templates/`` with the given context."""

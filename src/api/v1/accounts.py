@@ -1,21 +1,24 @@
-"""Registration, activation and session endpoints.
+"""Registration, activation, session and password endpoints.
 
-Each handler is dependencies in, one service call, return. The resend endpoint
-answers with one fixed message whatever the outcome, which is what keeps an
-unknown address indistinguishable from a settled account.
+Each handler is dependencies in, one service call, return. Two of them answer with
+one fixed message whatever the outcome — the activation resend and the password
+reset request — which is what keeps an unknown address indistinguishable from a
+settled account.
 
 ``/login/`` answers 201 rather than 200: it creates a session resource, and the
-refresh token it returns is the handle to it.
+refresh token it returns is the handle to it. The password routes answer 200:
+they change the state of a resource that already exists.
 """
 
 from typing import Final
 
 from fastapi import APIRouter, status
 
-from src.api.deps import (
+from src.api.deps import CurrentUserDep
+from src.api.providers import (
     ActivationServiceDep,
     AuthenticationServiceDep,
-    CurrentUserDep,
+    PasswordServiceDep,
     RegistrationServiceDep,
 )
 from src.models.accounts import User
@@ -26,6 +29,11 @@ from src.schemas.accounts import (
     UserRegistrationResponseSchema,
 )
 from src.schemas.common import MessageResponseSchema
+from src.schemas.password import (
+    PasswordChangeRequestSchema,
+    PasswordResetCompleteSchema,
+    PasswordResetRequestSchema,
+)
 from src.schemas.tokens import (
     AccessTokenResponseSchema,
     LoginRequestSchema,
@@ -43,6 +51,15 @@ RESEND_ACKNOWLEDGED_MESSAGE: Final[str] = (
     "If the account exists and is not yet active, an activation e-mail has been sent."
 )
 LOGOUT_COMPLETE_MESSAGE: Final[str] = "Session ended successfully."
+PASSWORD_CHANGED_MESSAGE: Final[str] = (
+    "Password changed successfully. Every session has been signed out."
+)
+RESET_ACKNOWLEDGED_MESSAGE: Final[str] = (
+    "If the account exists and is active, a password reset e-mail has been sent."
+)
+RESET_COMPLETE_MESSAGE: Final[str] = (
+    "Password has been reset. You can log in with the new password."
+)
 
 
 @router.post(
@@ -169,3 +186,73 @@ async def logout(
     """Revoke the presented refresh token, leaving the caller's others alive."""
     await service.logout(current_user.id, payload.refresh_token)
     return MessageResponseSchema(message=LOGOUT_COMPLETE_MESSAGE)
+
+
+@router.post(
+    "/change-password/",
+    response_model=MessageResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Change the password of the authenticated account",
+    responses={
+        400: {"description": "The new password is the one already in use."},
+        401: {
+            "description": "No bearer token, an invalid one, or a wrong current "
+            "password."
+        },
+        403: {"description": "The authenticated account is no longer active."},
+        422: {"description": "Malformed payload or a new password that is too weak."},
+    },
+)
+async def change_password(
+    payload: PasswordChangeRequestSchema,
+    current_user: CurrentUserDep,
+    service: PasswordServiceDep,
+) -> MessageResponseSchema:
+    """Replace the caller's own password and end every session they hold."""
+    await service.change_password(
+        current_user, payload.old_password, payload.new_password
+    )
+    return MessageResponseSchema(message=PASSWORD_CHANGED_MESSAGE)
+
+
+@router.post(
+    "/password-reset/request/",
+    response_model=MessageResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Request a password reset link",
+    responses={
+        200: {
+            "description": "Acknowledged; the reply never reveals whether the "
+            "account exists or is active."
+        },
+        422: {"description": "Malformed payload."},
+        502: {"description": "The reset e-mail could not be delivered."},
+    },
+)
+async def request_password_reset(
+    payload: PasswordResetRequestSchema,
+    service: PasswordServiceDep,
+) -> MessageResponseSchema:
+    """Issue a reset token when warranted, and always acknowledge."""
+    await service.request_reset(payload.email)
+    return MessageResponseSchema(message=RESET_ACKNOWLEDGED_MESSAGE)
+
+
+@router.post(
+    "/password-reset/complete/",
+    response_model=MessageResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Set a new password using a reset token",
+    responses={
+        400: {"description": "The token is invalid, spent, expired or foreign."},
+        422: {"description": "Malformed payload or a new password that is too weak."},
+        502: {"description": "The confirmation e-mail could not be delivered."},
+    },
+)
+async def complete_password_reset(
+    payload: PasswordResetCompleteSchema,
+    service: PasswordServiceDep,
+) -> MessageResponseSchema:
+    """Consume the reset token, set the new password and end every session."""
+    await service.complete_reset(payload.email, payload.token, payload.new_password)
+    return MessageResponseSchema(message=RESET_COMPLETE_MESSAGE)
